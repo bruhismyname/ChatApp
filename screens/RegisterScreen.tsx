@@ -66,16 +66,10 @@ export default function RegisterScreen({ navigation }: Props) {
       });
 
       await setDoc(doc(db, "users", userCredential.user.uid), {
-        username: username.toLowerCase(), 
+        username: username.toLowerCase(),
         email: email,
         createdAt: new Date().toISOString()
       });
-
-      Alert.alert(
-        "Berhasil!", 
-        "Akun berhasil dibuat. Silakan login.",
-        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
-      );
 
     } catch (error: any) {
       let errorMessage = "Terjadi kesalahan";
@@ -124,7 +118,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <Text style={styles.label}>📧 Email</Text>
             <TextInput
               style={styles.input}
-              placeholder="contoh@email.com"
+              placeholder="contoh@gmail.com"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
