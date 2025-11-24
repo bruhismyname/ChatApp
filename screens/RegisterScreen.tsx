@@ -13,84 +13,82 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
 import { 
-  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
   auth,
   db,
-  usersCollection,
-  query,
-  where,
-  getDocs
+  doc,
+  setDoc
 } from "../firebase";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Login">;
+type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 
-export default function LoginScreen({ navigation }: Props) {
-  const [usernameOrEmail, setUsernameOrEmail] = useState<string>("");
+export default function RegisterScreen({ navigation }: Props) {
+  const [username, setUsername] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  const isEmail = (input: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(input);
-  };
-
-  const getEmailFromUsername = async (username: string): Promise<string | null> => {
-    try {
-      const q = query(
-        usersCollection, 
-        where("username", "==", username.toLowerCase())
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data();
-        return userData.email;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting email:", error);
-      return null;
+  const handleRegister = async () => {
+    if (!username.trim() || !email.trim() || !password || !confirmPassword) {
+      Alert.alert("Error", "Semua field wajib diisi!");
+      return;
     }
-  };
 
-  const handleLogin = async () => {
-    if (!usernameOrEmail.trim() || !password) {
-      Alert.alert("Error", "Username/Email dan Password wajib diisi");
+    if (username.length < 3) {
+      Alert.alert("Error", "Username minimal 3 karakter");
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert("Error", "Password minimal 6 karakter");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Password dan konfirmasi tidak sama");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Error", "Format email tidak valid");
       return;
     }
 
     setLoading(true);
     try {
-      let emailToUse = usernameOrEmail.trim();
-
-      if (!isEmail(usernameOrEmail)) {
-        const foundEmail = await getEmailFromUsername(usernameOrEmail);
-        
-        if (!foundEmail) {
-          Alert.alert("Login Gagal", "Username tidak ditemukan");
-          setLoading(false);
-          return;
-        }
-        
-        emailToUse = foundEmail;
-      }
-
-      await signInWithEmailAndPassword(auth, emailToUse, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
+      await updateProfile(userCredential.user, {
+        displayName: username
+      });
+
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        username: username.toLowerCase(), 
+        email: email,
+        createdAt: new Date().toISOString()
+      });
+
+      Alert.alert(
+        "Berhasil!", 
+        "Akun berhasil dibuat. Silakan login.",
+        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+      );
+
     } catch (error: any) {
-      let errorMessage = "Login gagal";
+      let errorMessage = "Terjadi kesalahan";
       
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = "Email tidak terdaftar";
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = "Password salah";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Email sudah terdaftar";
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = "Format email tidak valid";
-      } else if (error.code === 'auth/invalid-credential') {
-        errorMessage = "Email atau password salah";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password terlalu lemah";
       }
       
-      Alert.alert("Login Gagal", errorMessage);
+      Alert.alert("Gagal Daftar", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -107,17 +105,28 @@ export default function LoginScreen({ navigation }: Props) {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>💬 Chat App</Text>
-          <Text style={styles.headerSubtitle}>Masuk ke Akun Anda</Text>
+          <Text style={styles.headerSubtitle}>Buat Akun Baru</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>👤 Username / Email</Text>
+            <Text style={styles.label}>👤 Username</Text>
             <TextInput
               style={styles.input}
-              placeholder="Masukkan username atau email"
-              value={usernameOrEmail}
-              onChangeText={setUsernameOrEmail}
+              placeholder="Minimal 3 karakter"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>📧 Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="contoh@email.com"
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
             />
@@ -127,26 +136,37 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={styles.label}>🔒 Password</Text>
             <TextInput
               style={styles.input}
-              placeholder="Masukkan password"
+              placeholder="Minimal 6 karakter"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
           </View>
 
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>🔒 Konfirmasi Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ulangi password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
           <TouchableOpacity 
             style={[styles.button, loading && styles.buttonDisabled]} 
-            onPress={handleLogin}
+            onPress={handleRegister}
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? "Memproses..." : "LOGIN"}
+              {loading ? "Mendaftar..." : "DAFTAR"}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
             <Text style={styles.linkText}>
-              Belum punya akun? <Text style={styles.linkBold}>Daftar disini</Text>
+              Sudah punya akun? <Text style={styles.linkBold}>Login</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -185,7 +205,6 @@ const styles = StyleSheet.create({
   },
   form: {
     padding: 24,
-    marginTop: 20,
   },
   inputGroup: {
     marginBottom: 20,
