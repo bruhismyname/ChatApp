@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, SafeAreaView } from "react-native";
+import { View, Text, TextInput, Button, FlatList, StyleSheet, Alert } from "react-native";
 import { 
   addDoc, 
   serverTimestamp, 
@@ -7,12 +7,14 @@ import {
   orderBy, 
   onSnapshot, 
   messagesCollection,
-  auth,
-  signOut
+  auth,        
+  signOut      
 } from "../firebase";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // [BARU] Import ini
 
+// Tipe data pesan
 type MessageType = {
   id: string;
   text: string;
@@ -28,7 +30,25 @@ export default function ChatScreen({ navigation }: Props) {
   
   const currentUser = auth.currentUser?.email || "Anonymous";
 
+  // [BARU] Fungsi Load Cache
+  const loadCachedMessages = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem('chat_history');
+      if (cachedData) {
+        const parsedMessages = JSON.parse(cachedData);
+        setMessages(parsedMessages);
+        console.log("Loaded from cache:", parsedMessages.length, "messages");
+      }
+    } catch (error) {
+      console.log("Failed to load cache", error);
+    }
+  };
+
   useEffect(() => {
+    // 1. Coba load data lokal dulu (supaya cepat muncul)
+    loadCachedMessages();
+
+    // 2. Subscribe ke Firebase (untuk data live & update cache)
     const q = query(messagesCollection, orderBy("createdAt", "asc"));
     
     const unsub = onSnapshot(q, (snapshot) => {
@@ -39,7 +59,13 @@ export default function ChatScreen({ navigation }: Props) {
           ...(doc.data() as Omit<MessageType, "id">),
         });
       });
+      
+      // Update State Tampilan
       setMessages(list);
+
+      // [BARU] Simpan data terbaru ke Local Storage
+      AsyncStorage.setItem('chat_history', JSON.stringify(list))
+        .catch(err => console.error("Gagal simpan cache:", err));
     });
 
     return () => unsub();
@@ -51,18 +77,20 @@ export default function ChatScreen({ navigation }: Props) {
     try {
       await addDoc(messagesCollection, {
         text: message,
-        user: currentUser,
+        user: currentUser, 
         createdAt: serverTimestamp(),
       });
-      setMessage("");
+      setMessage(""); 
     } catch (error) {
       console.error("Gagal kirim pesan:", error);
-      Alert.alert("Error", "Gagal mengirim pesan");
+      Alert.alert("Error", "Gagal mengirim pesan. Cek koneksi internet.");
     }
   };
 
   const handleLogout = async () => {
     try {
+      // [OPSIONAL] Bersihkan history chat saat logout jika diinginkan
+      // await AsyncStorage.removeItem('chat_history'); 
       await signOut(auth);
     } catch (error: any) {
       Alert.alert("Error Logout", error.message);
@@ -80,27 +108,19 @@ export default function ChatScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* HEADER YANG DIPERBAIKI */}
+    <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
       <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <Text style={styles.userLabel}>User:</Text>
-          <Text style={styles.userEmail} numberOfLines={1}>{currentUser}</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>LOGOUT</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerText}>User: {currentUser}</Text>
+        <Button title="Logout" onPress={handleLogout} color="#d9534f" />
       </View>
 
-      {/* CHAT LIST */}
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.messageList}
+        contentContainerStyle={{ padding: 10, paddingBottom: 20 }}
       />
       
-      {/* INPUT AREA */}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -108,104 +128,41 @@ export default function ChatScreen({ navigation }: Props) {
           value={message}
           onChangeText={setMessage}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Text style={styles.sendButtonText}>KIRIM</Text>
-        </TouchableOpacity>
+        <Button title="Kirim" onPress={sendMessage} />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  // HEADER STYLES - UBAH BAGIAN INI
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 15,
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 35,        // UBAH DARI 12 JADI 16 (atau lebih)
-    paddingBottom: 12,     // TAMBAHKAN INI
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderBottomColor: '#ddd',
+    elevation: 2,
   },
-  userInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,       // UBAH DARI 10 JADI 16
-    paddingRight: 8,       // TAMBAHKAN INI
-  },
-  userLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginRight: 6,
-  },
-  userEmail: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    flexShrink: 1,         // TAMBAHKAN INI
-  },
-  logoutButton: {
-    backgroundColor: '#ff4444',
-    paddingHorizontal: 18, // UBAH DARI 16 JADI 18
-    paddingVertical: 10,   // UBAH DARI 8 JADI 10
-    borderRadius: 6,
-    flexShrink: 0,         // TAMBAHKAN INI
-  },
-  logoutText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  // MESSAGE LIST
-  messageList: {
-    padding: 10,
-    paddingBottom: 20,
-  },
-  // INPUT AREA
+  headerText: { fontWeight: 'bold', maxWidth: '70%' },
   inputRow: { 
     flexDirection: "row", 
     padding: 10, 
     borderTopWidth: 1, 
     borderColor: "#ccc", 
-    backgroundColor: '#fff',
-    alignItems: 'center',
+    backgroundColor: '#fff' 
   },
   input: { 
     flex: 1, 
     borderWidth: 1, 
     borderColor: "#ccc", 
     marginRight: 10, 
-    padding: 10, 
-    borderRadius: 20,
+    padding: 8, 
+    borderRadius: 20, 
     paddingHorizontal: 15,
-    backgroundColor: '#fff',
-    fontSize: 15,
+    backgroundColor: '#fff'
   },
-  sendButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  // MESSAGE BUBBLES
   msgBox: { 
     padding: 10, 
     marginVertical: 4, 
@@ -224,14 +181,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee'
   },
-  sender: { 
-    fontSize: 10, 
-    fontWeight: "bold", 
-    marginBottom: 2, 
-    color: '#888' 
-  },
-  msgText: {
-    fontSize: 16,
-    color: '#333'
-  }
+  sender: { fontSize: 10, fontWeight: "bold", marginBottom: 2, color: '#888' },
+  msgText: { fontSize: 16, color: '#333' }
 });
