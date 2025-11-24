@@ -1,13 +1,11 @@
 import { initializeApp } from "firebase/app";
-// [MODIFIKASI] Import tambahan untuk persistensi React Native
 import { 
   initializeAuth, 
   getReactNativePersistence,
-  signInAnonymously, 
-  onAuthStateChanged,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut 
+  signOut,
+  onAuthStateChanged
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -19,8 +17,6 @@ import {
   onSnapshot 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage"; 
-
-// [MODIFIKASI] Import AsyncStorage
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
@@ -34,8 +30,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// [MODIFIKASI PENTING] 
-// Jangan pakai getAuth(app) biasa. Gunakan ini agar login tersimpan saat app di-kill:
+// Auth dengan persistensi AsyncStorage untuk auto-login
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage)
 });
@@ -45,18 +40,17 @@ const storage = getStorage(app);
 const messagesCollection = collection(db, "messages");
 
 export { 
-    auth, 
-    db, 
-    storage,
-    messagesCollection, 
-    signInAnonymously, 
-    onAuthStateChanged,
-    addDoc, 
-    serverTimestamp, 
-    query, 
-    orderBy, 
-    onSnapshot,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signOut
+  auth, 
+  db, 
+  storage,
+  messagesCollection,
+  onAuthStateChanged,
+  addDoc, 
+  serverTimestamp, 
+  query, 
+  orderBy, 
+  onSnapshot,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
 };
