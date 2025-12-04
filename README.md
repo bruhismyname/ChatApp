@@ -183,25 +183,7 @@ ChatApp/
 
 ---
 
-## 🔥 Konfigurasi Firebase
-
-**ID Proyek**: `chatapp-d8e05`
-
-**Koleksi di Firestore**:
-1. **`messages`** - Menyimpan semua pesan chat
-   - `text`: isi pesan
-   - `user`: nama pengirim
-   - `imageBase64`: data gambar (jika ada)
-   - `createdAt`: waktu pengiriman
-
-2. **`users`** - Menyimpan data pengguna
-   - `username`: username (huruf kecil)
-   - `email`: email pengguna
-   - `createdAt`: waktu registrasi
-
----
-
-## 📸 Tampilan Aplikasi
+## 📸 UI
 
 1. **Halaman Login**: Formulir login dengan opsi ke registrasi
 2. **Halaman Registrasi**: Formulir registrasi dengan 4 kolom input
